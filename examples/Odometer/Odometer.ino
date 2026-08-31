@@ -13,13 +13,15 @@
  * console output.
  *
  * Once you connect to MiP's IP address via a Telnet client, the sketch will
- * verify that MiP is upright, reset the odometer, drive him forward and
- * backward a short distance, and read back the accumulated distance. Finally,
- * it outputs a formatted summary table.
+ * verify that MiP is upright, reset the odometer and wheel encoders, drive him 
+ * forward and backward a short distance, and read back the accumulated distances. 
+ * Finally, it outputs a formatted summary table.
  *
  * Exhaustively tests the following APIs:
  *   - odometer.reset()
  *   - odometer.read()
+ *   - odometer.resetEncoders()
+ *   - odometer.readEncoders()
  *
  * @author Samuel Trassare (Maintainer)
  * @copyright Copyright (C) 2018-2026 Samuel Trassare
@@ -87,7 +89,10 @@ void runExhaustiveTests() {
 
   bool t_reset = false;
   bool t_read_initial = false;
+  bool t_resetEncoders = false;
+  bool t_readEncoders_initial = false;
   bool t_read_after = false;
+  bool t_readEncoders_after = false;
 
   TEST_PRINTLN(F("Waiting for MiP to be standing upright before driving..."));
   while (!mip.position.isUpright()) {
@@ -120,6 +125,31 @@ void runExhaustiveTests() {
   delay(500);
 
   // ---------------------------------------------------------
+  // TEST 3: resetEncoders()
+  // ---------------------------------------------------------
+  TEST_PRINTLN(F("Test 3: resetEncoders()"));
+  mip.odometer.resetEncoders();
+  t_resetEncoders = !mip.didLastCallFail();
+  delay(500);
+
+  // ---------------------------------------------------------
+  // TEST 4: readEncoders() [Initial]
+  // ---------------------------------------------------------
+  TEST_PRINTLN(F("Test 4: readEncoders() [Initial zero verification]"));
+  uint16_t leftTicks = 0;
+  uint16_t rightTicks = 0;
+  mip.odometer.readEncoders(leftTicks, rightTicks);
+
+  // Implicitly verify that the encoders were zeroed
+  t_readEncoders_initial = !mip.didLastCallFail() && (leftTicks == 0) && (rightTicks == 0);
+  
+  TEST_PRINT(F("  -> Left Ticks: "));
+  TEST_PRINT(leftTicks);
+  TEST_PRINT(F(" | Right Ticks: "));
+  TEST_PRINTLN(rightTicks);
+  delay(500);
+
+  // ---------------------------------------------------------
   // ACTION: Drive to accumulate distance
   // ---------------------------------------------------------
   TEST_PRINTLN(F("Driving forward and backward 15cm to accumulate distance..."));
@@ -133,9 +163,9 @@ void runExhaustiveTests() {
   delay(3000);
 
   // ---------------------------------------------------------
-  // TEST 3: read() [After Drive]
+  // TEST 5: read() [After Drive]
   // ---------------------------------------------------------
-  TEST_PRINTLN(F("Test 3: read() [After Drive accumulation]"));
+  TEST_PRINTLN(F("Test 5: read() [After Drive accumulation]"));
   float finalDistance = mip.odometer.read();
   
   // Verify that the distance reported increased after driving
@@ -144,6 +174,21 @@ void runExhaustiveTests() {
   TEST_PRINT(F("  -> Distance since reset: "));
   TEST_PRINT(finalDistance);
   TEST_PRINTLN(F(" cm"));
+  delay(500);
+
+  // ---------------------------------------------------------
+  // TEST 6: readEncoders() [After Drive]
+  // ---------------------------------------------------------
+  TEST_PRINTLN(F("Test 6: readEncoders() [After Drive accumulation]"));
+  mip.odometer.readEncoders(leftTicks, rightTicks);
+  
+  // Verify that the ticks increased after driving
+  t_readEncoders_after = !mip.didLastCallFail() && (leftTicks > 0) && (rightTicks > 0);
+
+  TEST_PRINT(F("  -> Left Ticks: "));
+  TEST_PRINT(leftTicks);
+  TEST_PRINT(F(" | Right Ticks: "));
+  TEST_PRINTLN(rightTicks);
   delay(500);
 
   // ---------------------------------------------------------
@@ -158,7 +203,10 @@ void runExhaustiveTests() {
   
   printTestResult("reset()", t_reset);
   printTestResult("read() [Initial]", t_read_initial);
+  printTestResult("resetEncoders()", t_resetEncoders);
+  printTestResult("readEncoders() [Initial]", t_readEncoders_initial);
   printTestResult("read() [After Drive]", t_read_after);
+  printTestResult("readEncoders() [After]", t_readEncoders_after);
   
   TEST_PRINTLN(F("=================================================="));
   TEST_PRINTLN(F("Odometer.ino: Tests Complete."));
