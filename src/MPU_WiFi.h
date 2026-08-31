@@ -2,7 +2,9 @@
  * @file MPU_WiFi.h
  * @brief Defines the public interface for WiFi management in the MiP library.
  *
- * @details This header declares the WiFi API used to connect MiP to a network.
+ * @details This header declares the WiFi API used to connect MiP to a network,
+ * establishing capabilities like Over-The-Air (OTA) updates and mDNS name
+ * resolution on ESP8266 and ESP32 targets.
  *
  * @author Samuel Trassare (Original Author)
  * @copyright Copyright (C) 2018-2026 Samuel Trassare
@@ -14,6 +16,8 @@
  */
 #ifndef MPU_WIFI_H
 #define MPU_WIFI_H
+
+#if defined(ESP8266) || defined(ESP32)
 
 #include <Arduino.h>
 #include <ArduinoOTA.h>
@@ -102,4 +106,5 @@ private:
   friend class MiP;
 };
 
+#endif  // defined(ESP8266) || defined(ESP32)
 #endif  // MPU_WIFI_H

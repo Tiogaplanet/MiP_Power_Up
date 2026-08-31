@@ -13,7 +13,7 @@
  * http://www.apache.org/licenses/LICENSE-2.0
  */
 #include "MPU_Radar.h"
-#include "MiP_Power_Up_-_D1_mini.h"
+#include "MiP_Power_Up.h"
 
 // Implement the constructor to store the MiP reference.
 MiP_Radar::MiP_Radar(MiP& mip) : m_mip(mip) {

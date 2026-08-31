@@ -9,6 +9,8 @@ jobs:
   validate-and-build:
     name: Lint & Compile Tests
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
 
     steps:
       - name: Checkout Code
@@ -20,41 +22,74 @@ jobs:
           compliance: specification
           library-manager: submit
 
-      # Official action (same as arduino-compile.yml)
       - name: Setup Arduino CLI
         uses: arduino/setup-arduino-cli@v2
 
-      - name: Install ESP8266 Core Platform
+      - name: Install ESP8266 and AVR Cores
         run: |
+          # Add the ESP8266 board manager URL and update the index
           arduino-cli core update-index --additional-urls https://arduino.esp8266.com/stable/package_esp8266com_index.json
+          
+          # Install ESP8266 core
           arduino-cli core install esp8266:esp8266 --additional-urls https://arduino.esp8266.com/stable/package_esp8266com_index.json
+          
+          # Install AVR core for Pro Mini
+          arduino-cli core install arduino:avr
 
-      # Optional: same elf2bin patch as compile workflow (safe to keep)
-      - name: Patch elf2bin.py Syntax Warnings
+      - name: Patch elf2bin.py Syntax Warnings (ESP8266 toolchain fix)
         run: |
-          python3 -c "
+          python3 - << 'EOF'
           import os
           path = os.path.expanduser('~/.arduino15/packages/esp8266/hardware/esp8266/3.1.2/tools/elf2bin.py')
           if os.path.exists(path):
-              with open(path, 'r') as f: text = f.read()
-              text = text.replace(\"re.split('\s+', line)\", \"re.split(r'\s+', line)\")
-              with open(path, 'w') as f: f.write(text)
+              with open(path, 'r') as f:
+                  text = f.read()
+              # Safely replace the regex string without shell escape interference
+              text = text.replace("re.split('\\s+', line)", "re.split(r'\\s+', line)")
+              with open(path, 'w') as f:
+                  f.write(text)
               print('Successfully patched elf2bin.py')
           else:
               print('Warning: elf2bin.py target file path not found')
-          "
+          EOF
 
       - name: Install Local Library
         run: |
           mkdir -p $HOME/Arduino/libraries
-          ln -s $GITHUB_WORKSPACE $HOME/Arduino/libraries/MPU_D1_mini_lib
+          # Symlink the workspace into the Arduino libraries folder using the unified library name
+          ln -s $GITHUB_WORKSPACE $HOME/Arduino/libraries/MiP_Power_Up
 
-      - name: Compile all examples
+      - name: Generate fake secrets.h for CI tests
         run: |
-          for example in $HOME/Arduino/libraries/MPU_D1_mini_lib/examples/*; do
+          # Create a dummy secrets.h file in every example directory so #include "secrets.h" compiles successfully
+          for example in $HOME/Arduino/libraries/MiP_Power_Up/examples/*; do
             if [ -d "$example" ]; then
-              echo "Building $example..."
+              echo '#define SECRET_SSID "CI_TEST_SSID"' > "$example/secrets.h"
+              echo '#define SECRET_PASS "CI_TEST_PASS"' >> "$example/secrets.h"
+            fi
+          done
+
+      - name: Compile all examples across architectures
+        run: |
+          for example in $HOME/Arduino/libraries/MiP_Power_Up/examples/*; do
+            if [ -d "$example" ]; then
+              EXAMPLE_NAME=$(basename "$example")
+              echo "============================================================"
+              echo "Compiling $EXAMPLE_NAME"
+              echo "============================================================"
+              
+              # Always compile for D1 mini (ESP8266)
+              echo "Target: ESP8266 (D1 mini)"
               arduino-cli compile --warnings all --fqbn esp8266:esp8266:d1_mini "$example"
+              
+              # Skip AVR compilation for examples that use networking or LittleFS
+              if [[ "$EXAMPLE_NAME" == *"WiFi"* || "$EXAMPLE_NAME" == *"Debug"* ]]; then
+                echo "Target: AVR (Pro Mini) -> SKIPPED (Requires ESP8266 network/filesystem features)"
+              else
+                echo "Target: AVR (Pro Mini)"
+                arduino-cli compile --warnings all --fqbn arduino:avr:pro:cpu=16MHzatmega328 "$example"
+              fi
+              echo ""
             fi
           done
 
@@ -87,7 +122,7 @@ jobs:
               with open(changelog_path, "r", encoding="utf-8") as f:
                   content = f.read()
 
-              # Pattern to match the version section, e.g. ## [2.0.2] - 2026-08-13
+              # Pattern to match the version section, e.g. ## [2.0.2]
               pattern = r"##\s*\[" + re.escape(version) + r"\].*?\n(.*?)(?=\n##\s*\[|\Z)"
               match = re.search(pattern, content, re.DOTALL)
 
@@ -109,7 +144,7 @@ jobs:
 
       - name: Package Library ZIP
         run: |
-          ZIP_NAME="MPU_D1_mini-${{ steps.vars.outputs.VERSION }}.zip"
+          ZIP_NAME="MiP_Power_Up-${{ steps.vars.outputs.VERSION }}.zip"
           zip -r "$ZIP_NAME" . -x "*.git*" "bump_version.py" ".github*"
 
       - name: Create Release
@@ -122,6 +157,6 @@ jobs:
           prerelease: false
           generate_release_notes: true
           files: |
-            MPU_D1_mini-${{ steps.vars.outputs.VERSION }}.zip
+            MiP_Power_Up-${{ steps.vars.outputs.VERSION }}.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -14,7 +14,7 @@
  * http://www.apache.org/licenses/LICENSE-2.0
  */
 #include "MPU_ChestLED.h"
-#include "MiP_Power_Up_-_D1_mini.h"
+#include "MiP_Power_Up.h"
 
 MiP_ChestLED::MiP_ChestLED(MiP& mip) : m_mip(mip) {}
 

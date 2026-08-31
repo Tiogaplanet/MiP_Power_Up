@@ -1,24 +1,30 @@
 /**
- * @file Weight.ino
- * @brief Exhaustive test and wireless demonstration of MiP's weight reporting.
+ * @file Core.ino
+ * @brief Exhaustive test and wireless demonstration of the core MiP lifecycle APIs.
  *
  * @details This sketch serves as both a tutorial for the user and an exhaustive
- * test suite for the MiP_Weight class. Because testing weight requires MiP
- * to be upright and balancing (which is easier with the USB cable disconnected),
- * this sketch connects to WiFi and outputs all test results wirelessly via a
- * Telnet server using the MiP_Debug class. WiFi credentials are securely loaded
- * from a local secrets.h file.
+ * test suite for the main MiP orchestrator class. Because the final test puts 
+ * MiP to sleep (which causes him to drop to the floor), this sketch connects 
+ * to WiFi and outputs all test results wirelessly via a Telnet server using 
+ * the MiP_Debug class, preventing USB cable snags. WiFi credentials are 
+ * securely loaded from a local secrets.h file.
  *
  * On AVR targets (like the Pro Mini), the sketch falls back to standard USB
  * console output.
  *
  * Once you connect to MiP's IP address via a Telnet client, the sketch will
- * verify that MiP is upright, read the payload weight, and output an exhaustive
- * summary table. Afterwards, it enters an interactive mode, printing MiP's
- * physical payload weight in real-time as you add or remove objects from his tray.
+ * verify the connection, test error-handling states, demonstrate disconnecting
+ * and reconnecting, and finally put MiP into a deep sleep mode.
  *
- * Exhaustively tests the following APIs:
- *   - weight.read()
+ * Exhaustively tests the following core APIs:
+ *   - begin()
+ *   - isInitialized()
+ *   - getBaudRate()
+ *   - didLastCallFail()
+ *   - lastCallResult()
+ *   - printLastCallResult()
+ *   - end()
+ *   - sleep()
  *
  * @author Samuel Trassare (Maintainer)
  * @copyright Copyright (C) 2018-2026 Samuel Trassare
@@ -36,14 +42,13 @@
 
   const char* ssid = SECRET_SSID;
   const char* password = SECRET_PASS;
-  const char* hostname = "MiP-Weight";
+  const char* hostname = "MiP-Core";
   MiP_Debug debug;
 #endif
 
 MiP mip;
 bool connectResult;
 bool hasRunTests = false;
-int8_t lastWeight = -128;
 
 // Helper macro to route printing to either Telnet (ESP) or USB Console (AVR)
 #if defined(ESP8266) || defined(ESP32)
@@ -82,48 +87,94 @@ void printTestResult(const char* testName, bool passed) {
  * @brief Runs the exhaustive API test sequence and prints the summary table.
  */
 void runExhaustiveTests() {
-  TEST_PRINTLN(F("Weight.ino: Starting Exhaustive MiP_Weight Tests..."));
+  TEST_PRINTLN(F("Core.ino: Starting Exhaustive MiP Lifecycle Tests..."));
   TEST_PRINTLN();
 
-  bool t_read = false;
+  bool t_begin = connectResult;
+  bool t_isInitialized = false;
+  bool t_getBaudRate = false;
+  bool t_errorHandling = false;
+  bool t_end = false;
+  bool t_sleep = false;
 
-  TEST_PRINTLN(F("Waiting for MiP to be standing upright to measure weight..."));
-  while (!mip.position.isUpright()) {
-    delay(100); // Yield CPU time to prevent watchdog resets while waiting
-  }
+  // ---------------------------------------------------------
+  // TEST 1: isInitialized() & getBaudRate()
+  // ---------------------------------------------------------
+  TEST_PRINTLN(F("Test 1: isInitialized() & getBaudRate()"));
+  t_isInitialized = mip.isInitialized();
+  uint32_t baud = mip.getBaudRate();
+  t_getBaudRate = (baud == 115200 || baud == 9600);
   
-  // Give MiP a moment to settle after being stood up
+  TEST_PRINT(F("  -> Connection Initialized: "));
+  TEST_PRINTLN(t_isInitialized ? F("True") : F("False"));
+  TEST_PRINT(F("  -> Negotiated Baud Rate: "));
+  TEST_PRINTLN(baud);
   delay(1000);
 
   // ---------------------------------------------------------
-  // TEST 1: read()
+  // TEST 2: Error Handling APIs
   // ---------------------------------------------------------
-  TEST_PRINTLN(F("Test 1: read()"));
-  int8_t currentWeight = mip.weight.read();
-  t_read = !mip.didLastCallFail();
+  TEST_PRINTLN(F("Test 2: Error Handling (didLastCallFail, lastCallResult)"));
+  TEST_PRINTLN(F("  -> Inducing an intentional API error by reading an empty queue..."));
   
-  TEST_PRINT(F("  -> Initial weight reading: "));
-  TEST_PRINT(currentWeight);
-  TEST_PRINTLN(F(" g"));
-  delay(500);
+  // Drain queue and try to read to trigger MIP_ERROR_NO_EVENT
+  while (mip.clap.availableEvents() > 0) mip.clap.readEvent();
+  mip.clap.readEvent(); 
+  
+  t_errorHandling = mip.didLastCallFail() && (mip.lastCallResult() == MiP::MIP_ERROR_NO_EVENT);
+  
+  // Note: printLastCallResult() automatically routes to the USB Hardware Serial debug port.
+  mip.printLastCallResult(); 
+  delay(1000);
+
+  // ---------------------------------------------------------
+  // TEST 3: end()
+  // ---------------------------------------------------------
+  TEST_PRINTLN(F("Test 3: end()"));
+  TEST_PRINTLN(F("  -> Disconnecting from MiP. Chest LED should turn blue."));
+  mip.end();
+  t_end = !mip.isInitialized();
+  delay(3000); // Wait long enough for the user to observe the disconnect
+
+  // Reconnect for the final test
+  TEST_PRINTLN(F("  -> Reconnecting for the final test..."));
+  bool reconnected = mip.begin();
+  if (!reconnected) {
+    TEST_PRINTLN(F("  -> Failed to reconnect!"));
+  }
+  delay(1000);
+
+  // ---------------------------------------------------------
+  // TEST 4: sleep()
+  // ---------------------------------------------------------
+  TEST_PRINTLN(F("Test 4: sleep()"));
+  if (reconnected) {
+    TEST_PRINTLN(F("  -> Putting MiP to sleep. Watch him fall!"));
+    mip.sleep();
+    t_sleep = true;
+  }
+  delay(1500);
 
   // ---------------------------------------------------------
   // PRINT SUMMARY TABLE TO CONSOLE
   // ---------------------------------------------------------
   TEST_PRINTLN();
   TEST_PRINTLN(F("=================================================="));
-  TEST_PRINTLN(F(" MiP_Weight Exhaustive Test Summary"));
+  TEST_PRINTLN(F(" MiP Core API Exhaustive Test Summary"));
   TEST_PRINTLN(F("=================================================="));
   TEST_PRINTLN(F(" Method / Feature                 | Result"));
   TEST_PRINTLN(F("----------------------------------|---------------"));
   
-  printTestResult("read()", t_read);
+  printTestResult("begin()", t_begin);
+  printTestResult("isInitialized()", t_isInitialized);
+  printTestResult("getBaudRate()", t_getBaudRate);
+  printTestResult("Error Handling API", t_errorHandling);
+  printTestResult("end()", t_end);
+  printTestResult("sleep()", t_sleep);
   
   TEST_PRINTLN(F("=================================================="));
-  TEST_PRINTLN(F("Weight.ino: Tests Complete."));
-  TEST_PRINTLN();
-  TEST_PRINTLN(F("Now, try adding or removing objects from MiP's tray!"));
-  TEST_PRINTLN(F("Monitoring weight in real-time..."));
+  TEST_PRINTLN(F("Core.ino: Tests Complete."));
+  TEST_PRINTLN(F("Note: MiP requires a physical power cycle before accepting new connections."));
 }
 
 /**
@@ -136,14 +187,14 @@ void runExhaustiveTests() {
 void setup() {
   connectResult = mip.begin();
   if (!connectResult) {
-    mip.console.println(F("Weight.ino: Failed connecting to MiP."));
+    mip.console.println(F("Core.ino: Failed connecting to MiP."));
     return;
   }
 
 #if defined(ESP8266) || defined(ESP32)
   uint8_t wifiStatus = mip.wifi.begin(ssid, password, hostname);
   if (wifiStatus != WL_CONNECTED) {
-    mip.console.println(F("Weight.ino: Failed connecting to WiFi."));
+    mip.console.println(F("Core.ino: Failed connecting to WiFi."));
     connectResult = false;
     return;
   }
@@ -152,7 +203,7 @@ void setup() {
   debug.begin(hostname, MiP_Debug::INFO);
   
   // Print connection info to the USB Serial monitor before disconnecting it
-  mip.console.println(F("Weight.ino: WiFi Connected!"));
+  mip.console.println(F("Core.ino: WiFi Connected!"));
   mip.console.print(F("Please connect to Telnet at IP: "));
   mip.console.println(WiFi.localIP());
   mip.console.println(F("You may now disconnect the USB cable and place MiP on the floor."));
@@ -168,8 +219,6 @@ void setup() {
  *
  * @details Services the Telnet server and OTA network tasks. When a Telnet
  * client connects for the first time, it executes runExhaustiveTests().
- * Afterwards, it continuously polls MiP's payload weight and wirelessly prints
- * any updates.
  */
 void loop() {
   if (!connectResult) {
@@ -186,25 +235,6 @@ void loop() {
     hasRunTests = true;
   }
 #endif
-
-  // If the automated tests are done, stream live weight updates
-  bool shouldStream = false;
-#if defined(ESP8266) || defined(ESP32)
-  shouldStream = (hasRunTests && debug.isActive(MiP_Debug::INFO));
-#else
-  shouldStream = hasRunTests;
-#endif
-
-  if (shouldStream) {
-    int8_t currentWeight = mip.weight.read();
-
-    if (currentWeight != lastWeight) {
-      TEST_PRINT(F(" State Change: Payload Weight = "));
-      TEST_PRINT(currentWeight);
-      TEST_PRINTLN(F(" g"));
-      lastWeight = currentWeight;
-    }
-  }
 
   // Yield control briefly to prevent watchdog reset triggers
   delay(50);

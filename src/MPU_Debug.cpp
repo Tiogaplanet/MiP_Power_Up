@@ -1,7 +1,7 @@
 /**
  * @file MPU_Debug.cpp
- * @brief Defines the debug functionality and telnet logging interface for the
- * MiP library.
+ * @brief Implements the debug functionality for the MiP library on
+ * ESP8266/ESP32 targets.
  *
  * @author Joao Lopes (Original Author)
  * @author Samuel Trassare (Maintainer)
@@ -9,10 +9,13 @@
  * (https://github.com/Tiogaplanet) Licensed under the MIT License
  * (the "License"); you may not use this file except in compliance with
  * the License. You may obtain a copy of the License at
- * https://opensource.org/licenses/MIT.
+ * https://opensource.org/licenses/MIT
  */
+
+#if defined(ESP8266) || defined(ESP32)
+
 #include "MPU_Debug.h"
-#include "MiP_Power_Up_-_D1_mini.h"
+#include "MiP_Power_Up.h"
 
 WiFiServer telnetServer(MiP_Debug::TELNET_PORT);
 WiFiClient telnetClient;
@@ -348,7 +351,7 @@ void MiP_Debug::showHelp() {
   String help = "";
 
   help += "*** Welcome to MiP's debug terminal. This is version ";
-  help += MPU_D1_MINI_VERSION;
+  help += MIP_POWER_UP_VERSION;  // Pull dynamically from MiP_Power_Up.h
   help += ".\r\n* Hostname: ";
   help += m_hostname;
   help += "\r\n* IP: ";
@@ -383,7 +386,7 @@ void MiP_Debug::showHelp() {
   help += "    cpu80  -> Set the ESP8266 CPU to 80 MHz\r\n";
   help += "    cpu160 -> Set the ESP8266 CPU to 160 MHz\r\n";
   if (m_resetCommandEnabled) {
-    help += "    reset -> reset the D1 mini Pack\r\n";
+    help += "    reset -> reset the MiP Power Up\r\n";
   }
 
   if (m_helpProjectCmds != "" && m_callbackProjectCmds) {
@@ -495,7 +498,7 @@ void MiP_Debug::processCommand() {
     setNoFilter();
   } else if (m_command == "reset" && m_resetCommandEnabled) {
     telnetClient.println(
-      F("* Reset...\r\n* Closing telnet connection...\r\n* Resetting the D1 mini Pack..."));
+      F("* Reset...\r\n* Closing telnet connection...\r\n* Resetting the controller..."));
     telnetClient.stop();
     telnetServer.stop();
     delay(500);
@@ -520,7 +523,6 @@ void MiP_Debug::setNoFilter() {
   telnetClient.println(F("* Debug: Filter disabled"));
 }
 
-// Fast integer power of 10 formatting helper (replaces floating-point pow())
 String MiP_Debug::formatNumber(uint32_t value, uint8_t size, char insert) {
   String ret = "";
   uint32_t limit = 10;
@@ -530,7 +532,7 @@ String MiP_Debug::formatNumber(uint32_t value, uint8_t size, char insert) {
       for (uint8_t j = (size - i); j > 0; j--) { ret += insert; }
       break;
     }
-    limit *= 10;  // Fast integer power of 10
+    limit *= 10;
   }
 
   ret += value;
@@ -540,3 +542,5 @@ String MiP_Debug::formatNumber(uint32_t value, uint8_t size, char insert) {
 bool MiP_Debug::isCRLF(char character) {
   return (character == '\r' || character == '\n');
 }
+
+#endif  // defined(ESP8266) || defined(ESP32)

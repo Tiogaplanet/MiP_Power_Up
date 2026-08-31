@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to the MiP Power Up - D1 mini library are documented in this file.
+All notable changes to the MiP Power Up library are documented in this file.
 
 ## [2.0.2] - 2026-08-13
 ### Added
