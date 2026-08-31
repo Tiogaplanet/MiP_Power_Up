@@ -46,6 +46,27 @@ public:
    */
   void reset();
 
+  /**
+   * @brief Reads MiP's raw left and right wheel encoder tick counts.
+   *
+   * @details Undocumented command queries individual wheel encoder registers 
+   * (command 0x87) over UART. Useful for custom dead-reckoning, differential
+   * steering, or turn tracking. Performs a verified read with automatic retries on
+   * communication error.
+   *
+   * @param[out] leftTicks  Receives raw tick count for the left wheel encoder (16-bit).
+   * @param[out] rightTicks Receives raw tick count for the right wheel encoder (16-bit).
+   */
+  void readEncoders(uint16_t& leftTicks, uint16_t& rightTicks);
+
+  /**
+   * @brief Undocumented command resets MiP's raw left and right wheel encoder tick
+   * counters to zero.
+   *
+   * @details Sends command 0x88 over UART to zero out individual wheel encoder registers.
+   */
+  void resetEncoders();
+
 protected:
   /**
    * @brief MiP protocol command byte to read the accumulated wheel tick
@@ -58,6 +79,16 @@ protected:
    * to zero.
    */
   static constexpr uint8_t MIP_CMD_RESET_ODOMETER = 0x86;
+
+  /**
+   * @brief MiP undocumented protocol command byte to read raw individual wheel encoder ticks.
+   */
+  static constexpr uint8_t MIP_CMD_READ_RAW_ENCODERS = 0x87;
+
+  /**
+   * @brief MiP undocumented protocol command byte to reset raw individual wheel encoder counters to zero.
+   */
+  static constexpr uint8_t MIP_CMD_RESET_RAW_ENCODERS = 0x88;
 
   /**
    * @brief Encoder wheel ticks per centimeter ratio (48.5 ticks/cm).
@@ -91,6 +122,7 @@ private:
   int8_t verifiedReset();
 
   int8_t rawRead(float& distanceInCm);
+  int8_t rawReadEncoders(uint16_t& leftTicks, uint16_t& rightTicks);
 
   MiP& m_mip;  // Stores a reference to the main MiP class.
 

@@ -62,6 +62,32 @@ void MiP_Odometer::reset() {
   m_mip.m_lastError = result;
 }
 
+void MiP_Odometer::readEncoders(uint16_t& leftTicks, uint16_t& rightTicks) {
+  MIP_DEBUG_INFO_PRINTLN(m_mip, F("MiP->Odometer->readEncoders()"));
+  int8_t result = MiP::MIP_ERROR_NONE;
+
+  for (uint8_t retry = 0; retry < MiP_Serial::MIP_MAX_RETRIES; retry++) {
+    result = rawReadEncoders(leftTicks, rightTicks);
+    if (result == MiP::MIP_ERROR_NONE) {
+      m_mip.m_lastError = MiP::MIP_ERROR_NONE;
+      return;
+    }
+    delay(MiP_Serial::MIP_RETRY_WAIT);
+  }
+
+  leftTicks = 0;
+  rightTicks = 0;
+  m_mip.m_lastError = result;
+}
+
+void MiP_Odometer::resetEncoders() {
+  MIP_DEBUG_INFO_PRINTLN(m_mip, F("MiP->Odometer->resetEncoders()"));
+  uint8_t command[1] = {MIP_CMD_RESET_RAW_ENCODERS};
+
+  m_mip.serial.rawSend(command, sizeof(command));
+  m_mip.m_lastError = MiP::MIP_ERROR_NONE;
+}
+
 // ==========================================================================
 // Protected / Private functions.
 // ==========================================================================
@@ -110,5 +136,28 @@ int8_t MiP_Odometer::rawRead(float& distanceInCm) {
 
   // Odometer has 48.5 ticks / cm.
   distanceInCm = static_cast<float>(ticks) / TICKS_PER_CM;
+  return MiP::MIP_ERROR_NONE;
+}
+
+int8_t MiP_Odometer::rawReadEncoders(uint16_t& leftTicks, uint16_t& rightTicks) {
+  const uint8_t readEncoders[1] = {MIP_CMD_READ_RAW_ENCODERS};
+  uint8_t response[1 + 4];
+  size_t responseLength = 0;
+  int8_t result = m_mip.serial.rawReceive(readEncoders,
+                                          sizeof(readEncoders),
+                                          response,
+                                          sizeof(response),
+                                          responseLength);
+  if (result)
+    return result;
+  if (responseLength != sizeof(response) ||
+      response[0] != MIP_CMD_READ_RAW_ENCODERS) {
+    return MiP::MIP_ERROR_BAD_RESPONSE;
+  }
+
+  // Left ticks = bytes 1-2 (big-endian), Right ticks = bytes 3-4 (big-endian)
+  leftTicks = (static_cast<uint16_t>(response[1]) << 8) | response[2];
+  rightTicks = (static_cast<uint16_t>(response[3]) << 8) | response[4];
+
   return MiP::MIP_ERROR_NONE;
 }

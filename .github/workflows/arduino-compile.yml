@@ -5,12 +5,9 @@ permissions:
 
 on:
   push:
-    branches:
-      - master
-      - 49-consolidate-the-d1-mini-and-pro-mini-libraries
+    branches: [ "master", "minor-edits", "bug-hunt", "wheel-encoders" ]
   pull_request:
-    branches:
-      - master
+    branches: [ "master", "minor-edits", "bug-hunt", "wheel-encoders" ]
 
 jobs:
   build:
