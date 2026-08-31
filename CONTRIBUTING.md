@@ -1,4 +1,4 @@
-# Contributing to MiP Power Up - D1 mini
+# Contributing to the MiP Power Up library
 
 Thank you for taking the time to contribute to this library! 
 

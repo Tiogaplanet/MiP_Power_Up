@@ -14,7 +14,7 @@
  * http://www.apache.org/licenses/LICENSE-2.0
  */
 #include "MPU_Version.h"
-#include "MiP_Power_Up_-_D1_mini.h"
+#include "MiP_Power_Up.h"
 
 // Implement the constructor to store the MiP reference.
 MiP_Version::MiP_Version(MiP& mip) : m_mip(mip) {}
@@ -62,11 +62,11 @@ void MiP_Version::readSoftware(MiPSoftwareVersion& software) {
 }
 
 const char* MiP_Version::readMPUString() const {
-  return MPU_D1_MINI_VERSION;
+  return MIP_POWER_UP_VERSION;
 }
 
 uint32_t MiP_Version::readMPUNumber() const {
-  return MPU_D1_MINI_VERSION_NUMBER;
+  return MIP_POWER_UP_VERSION_NUMBER;
 }
 
 // ==========================================================================

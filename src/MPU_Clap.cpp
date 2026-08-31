@@ -13,7 +13,7 @@
  * http://www.apache.org/licenses/LICENSE-2.0
  */
 #include "MPU_Clap.h"
-#include "MiP_Power_Up_-_D1_mini.h"
+#include "MiP_Power_Up.h"
 
 MiP_Clap::MiP_Clap(MiP& mip) : m_mip(mip) {
   clear();

@@ -14,7 +14,7 @@
  * http://www.apache.org/licenses/LICENSE-2.0
  */
 #include "MPU_EEPROM.h"
-#include "MiP_Power_Up_-_D1_mini.h"
+#include "MiP_Power_Up.h"
 
 // Implement the constructor to store the MiP reference.
 MiP_EEPROM::MiP_EEPROM(MiP& mip) : m_mip(mip) {}

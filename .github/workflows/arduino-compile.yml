@@ -1,62 +1,94 @@
-name: Arduino Library CI
+name: Compile Arduino Examples
 
 permissions:
   contents: read
 
 on:
   push:
-    branches: [ "master", "minor-edits", "bug-hunt", "v2.0.2-rc" ]
+    branches:
+      - master
+      - 49-consolidate-the-d1-mini-and-pro-mini-libraries
   pull_request:
-    branches: [ "master", "minor-edits", "bug-hunt", "v2.0.2-rc" ]
+    branches:
+      - master
 
 jobs:
   build:
+    name: Test Compile Examples
     runs-on: ubuntu-latest
 
     steps:
-      # Step 1: Checkout the bug-hunt branch from the repository
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      # Step 2: Set up the official Arduino CLI tool
       - name: Setup Arduino CLI
         uses: arduino/setup-arduino-cli@v2
 
-      # Step 3: Install the ESP8266 core required for Wemos boards
-      - name: Install ESP8266 Core Platform
+      - name: Install ESP8266 and AVR Cores
         run: |
+          # Add the ESP8266 board manager URL and update the index
           arduino-cli core update-index --additional-urls https://arduino.esp8266.com/stable/package_esp8266com_index.json
+          
+          # Install ESP8266 core
           arduino-cli core install esp8266:esp8266 --additional-urls https://arduino.esp8266.com/stable/package_esp8266com_index.json
+          
+          # Install AVR core for Pro Mini
+          arduino-cli core install arduino:avr
 
-      # Step 3.5: Patch elf2bin.py Syntax Warnings via Python Inline Code
-      # Step 3.5 can be removed if the esp8266 library releases the current (29-Jul-2026) git master branch in a new version.
-      - name: Patch elf2bin.py Syntax Warnings
+      - name: Patch elf2bin.py Syntax Warnings (ESP8266 toolchain fix)
         run: |
-          python3 -c "
+          python3 - << 'EOF'
           import os
           path = os.path.expanduser('~/.arduino15/packages/esp8266/hardware/esp8266/3.1.2/tools/elf2bin.py')
           if os.path.exists(path):
-              with open(path, 'r') as f: text = f.read()
-              text = text.replace(\"re.split('\s+', line)\", \"re.split(r'\s+', line)\")
-              with open(path, 'w') as f: f.write(text)
+              with open(path, 'r') as f:
+                  text = f.read()
+              # Safely replace the regex string without shell escape interference
+              text = text.replace("re.split('\\s+', line)", "re.split(r'\\s+', line)")
+              with open(path, 'w') as f:
+                  f.write(text)
               print('Successfully patched elf2bin.py')
           else:
               print('Warning: elf2bin.py target file path not found')
-          "
+          EOF
 
-      # Step 4: Symlink this repository into the local Arduino library path
-      # This allows the CLI compiler to locate and include your "MPU_D1_mini_lib"
       - name: Install Local Library
         run: |
           mkdir -p $HOME/Arduino/libraries
-          ln -s $GITHUB_WORKSPACE $HOME/Arduino/libraries/MPU_D1_mini_lib
+          # Symlink the workspace into the Arduino libraries folder using the unified library name
+          ln -s $GITHUB_WORKSPACE $HOME/Arduino/libraries/MiP_Power_Up
 
-      # Step 5: Compile all the example sketches to look for bugs.
-      # Replace "ExampleName" with the actual folder name inside your /examples directory
-      - name: Compile all examples
+      - name: Generate fake secrets.h for CI tests
         run: |
-          for example in $HOME/Arduino/libraries/MPU_D1_mini_lib/examples/*; do
+          # Create a dummy secrets.h file in every example directory so #include "secrets.h" compiles successfully
+          for example in $HOME/Arduino/libraries/MiP_Power_Up/examples/*; do
             if [ -d "$example" ]; then
+              echo '#define SECRET_SSID "CI_TEST_SSID"' > "$example/secrets.h"
+              echo '#define SECRET_PASS "CI_TEST_PASS"' >> "$example/secrets.h"
+              echo '#define SECRET_HOSTNAME "CI_TEST_HOSTNAME"' >> "$example/secrets.h"
+            fi
+          done
+
+      - name: Compile all examples across architectures
+        run: |
+          for example in $HOME/Arduino/libraries/MiP_Power_Up/examples/*; do
+            if [ -d "$example" ]; then
+              EXAMPLE_NAME=$(basename "$example")
+              echo "============================================================"
+              echo "Compiling $EXAMPLE_NAME"
+              echo "============================================================"
+              
+              # Always compile for D1 mini (ESP8266)
+              echo "Target: ESP8266 (D1 mini)"
               arduino-cli compile --warnings all --fqbn esp8266:esp8266:d1_mini "$example"
+              
+              # Skip AVR compilation for examples that use networking primarily
+              if [[ "$EXAMPLE_NAME" == *"WiFi"* || "$EXAMPLE_NAME" == *"Debug"* ]]; then
+                echo "Target: AVR (Pro Mini) -> SKIPPED (Requires ESP8266 network features)"
+              else
+                echo "Target: AVR (Pro Mini)"
+                arduino-cli compile --warnings all --fqbn arduino:avr:pro:cpu=16MHzatmega328 "$example"
+              fi
+              echo ""
             fi
           done
