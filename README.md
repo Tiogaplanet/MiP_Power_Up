@@ -1,6 +1,6 @@
 # MiP Power Up Library 🤖⚡
 
-[![Arduino Compile](https://github.com/Tiogaplanet/MPU_D1_mini_lib/actions/workflows/arduino-compile.yml/badge.svg)](https://github.com/Tiogaplanet/MiP_Power_Up/actions)
+[![Arduino Compile](https://github.com/Tiogaplanet/MiP_Power_Up/actions/workflows/arduino-compile.yml/badge.svg)](https://github.com/Tiogaplanet/MiP_Power_Up/actions)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
