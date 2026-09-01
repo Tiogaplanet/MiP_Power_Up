@@ -118,7 +118,7 @@ class MiP_Radar {
   void processEvent(uint8_t radarValue);
 
   MiP& m_mip;              ///< Stores a reference to the main MiP class.
-  MiPRadar m_lastRadar; ///< The most recently cached radar event.
+  MiPRadar m_currentRadar; ///< The most recently cached radar event.
   bool m_isEnabled;        ///< Tracks whether continuous radar mode is active.
 
   friend class MiP;
