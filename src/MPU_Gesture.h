@@ -29,7 +29,7 @@ class MiP;
 enum MiPGestureMode : uint8_t {
   MIP_GESTURE_RADAR_DISABLED = 0x00,  ///< Both gesture detection and radar
                                       ///< tracking modes are disabled.
-  MIP_GESTURE = 0x02                  ///< Gesture detection mode is active.
+  MIP_GESTURE = 0x02,                  ///< Gesture detection mode is active.
   MIP_RADAR = 0x04                  ///< Sensor is in Radar mode.
 };
 
