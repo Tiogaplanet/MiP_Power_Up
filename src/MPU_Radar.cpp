@@ -24,7 +24,7 @@ MiP_Radar::MiP_Radar(MiP& mip) : m_mip(mip) {
 
 void MiP_Radar::enable() {
   MIP_DEBUG_INFO_PRINTLN(m_mip, F("MiP->Radar->enable()"));
-  uint8_t command[1 + 1] = {MIP_CMD_SET_RADAR_MODE, 0x04};
+  uint8_t command[1 + 1] = {MIP_CMD_SET_RADAR_MODE, MIP_RADAR};
 
   m_mip.serial.rawSend(command, sizeof(command));
   m_isEnabled = true;
