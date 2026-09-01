@@ -5,9 +5,9 @@ permissions:
 
 on:
   push:
-    branches: [ "master", "minor-edits", "bug-hunt", "wheel-encoders" ]
+    branches: [ "master", "46-give-me-a-ping-vasili-one-ping-only-please" ]
   pull_request:
-    branches: [ "master", "minor-edits", "bug-hunt", "wheel-encoders" ]
+    branches: [ "master", "46-give-me-a-ping-vasili-one-ping-only-please" ]
 
 jobs:
   build:
