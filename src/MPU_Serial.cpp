@@ -15,8 +15,7 @@
  * http://www.apache.org/licenses/LICENSE-2.0
  */
 #include "MPU_Serial.h"
-#include "MiP.h"
-#include <Arduino.h>
+#include "MiP_Power_Up.h"
 
 // Note: The original uploaded file was MPU_Serial.h, but the user asked to fix MPU_Serial.cpp.
 // The following is a likely implementation of MPU_Serial.cpp with the requested fix applied.
