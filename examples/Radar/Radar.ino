@@ -3,30 +3,27 @@
  * @brief Exhaustive test and wireless demonstration of MiP's radar sensing.
  *
  * @details This sketch serves as both a tutorial for the user and an exhaustive
- * test suite for the MiP_Radar class. Because testing radar is easiest when
- * MiP is upright, balancing, and untethered by a USB cable, this sketch 
- * connects to WiFi and outputs all test results wirelessly via a Telnet server 
- * using the MiP_Debug class. WiFi credentials are securely loaded from a local 
- * secrets.h file.
+ * test suite for the MiP_Radar class. Because testing radar requires MiP
+ * to be upright and balancing (which is easier with the USB cable disconnected),
+ * this sketch connects to WiFi and outputs all test results wirelessly via a
+ * Telnet server using the MiP_Debug class. WiFi credentials are securely loaded
+ * from a local secrets.h file.
  *
  * On AVR targets (like the Pro Mini), the sketch falls back to standard USB
  * console output.
  *
  * Once you connect to MiP's IP address via a Telnet client, the sketch will
- * verify that MiP is upright, execute the automated tests for enabling, 
- * disabling, checking state, querying one-shot pings, and clearing the cache. 
- * It then prints an exhaustive summary table. 
- *
- * Afterwards, it enters an interactive mode, printing MiP's detected radar 
- * ranges in real-time as you move your hand in front of his chest.
+ * verify that MiP is upright, execute the automated tests for enabling and 
+ * disabling radar mode, checking state, and querying the radar value. It then
+ * prints an exhaustive summary table. Afterwards, it enters an interactive mode, 
+ * printing MiP's detected radar ranges in real-time.
  *
  * Exhaustively tests the following APIs:
+ *   - radar.enable()
  *   - radar.disable()
  *   - radar.isEnabled()
- *   - radar.clear()
  *   - radar.read()
- *   - radar.ping()
- *   - radar.enable()
+ *   - radar.clear()
  *
  * @author Samuel Trassare (Maintainer)
  * @copyright Copyright (C) 2018-2026 Samuel Trassare
@@ -93,11 +90,10 @@ void runExhaustiveTests() {
   TEST_PRINTLN();
 
   bool t_disable = false;
-  bool t_disable_check = false;
-  bool t_clear_read = false;
-  bool t_ping = false;
   bool t_enable = false;
-  bool t_enable_check = false;
+  bool t_isEnabled = false;
+  bool t_clear = false;
+  bool t_read = false;
 
   TEST_PRINTLN(F("Waiting for MiP to be standing upright to test radar..."));
   while (!mip.position.isUpright()) {
@@ -112,45 +108,49 @@ void runExhaustiveTests() {
   // ---------------------------------------------------------
   TEST_PRINTLN(F("Test 1: disable() & isEnabled()"));
   mip.radar.disable();
-  t_disable = !mip.didLastCallFail();
+  bool disableSuccess = !mip.didLastCallFail();
 
   bool isEnabledNow = mip.radar.isEnabled();
-  t_disable_check = !mip.didLastCallFail() && (isEnabledNow == false);
+  bool checkDisableSuccess = !mip.didLastCallFail() && (isEnabledNow == false);
+  t_disable = (disableSuccess && checkDisableSuccess);
   delay(500);
 
   // ---------------------------------------------------------
-  // TEST 2: clear() & read() (Empty state)
+  // TEST 2: enable() & isEnabled()
   // ---------------------------------------------------------
-  TEST_PRINTLN(F("Test 2: clear() & read()"));
-  mip.radar.clear();
-  
-  // Since we disabled the radar and cleared the cache, read() should return invalid/no event.
-  MiPRadar currentRadar = mip.radar.read();
-  t_clear_read = (currentRadar == MIP_RADAR_INVALID && mip.lastCallResult() == MiP::MIP_ERROR_NO_EVENT);
-  delay(500);
-
-  // ---------------------------------------------------------
-  // TEST 3: ping() (One-shot synchronous read)
-  // ---------------------------------------------------------
-  TEST_PRINTLN(F("Test 3: ping() (One-shot radar query)"));
-  MiPRadar pingResult = mip.radar.ping();
-  t_ping = !mip.didLastCallFail() && (pingResult != MIP_RADAR_INVALID);
-  
-  TEST_PRINT(F("  -> Ping returned category: 0x"));
-  if (pingResult < 0x10) TEST_PRINT(F("0"));
-  TEST_PRINTLN(pingResult, HEX);
-  delay(500);
-
-  // ---------------------------------------------------------
-  // TEST 4: enable() & isEnabled()
-  // ---------------------------------------------------------
-  TEST_PRINTLN(F("Test 4: enable() & isEnabled()"));
+  TEST_PRINTLN(F("Test 2: enable() & isEnabled()"));
   mip.radar.enable();
-  t_enable = !mip.didLastCallFail();
+  bool enableSuccess = !mip.didLastCallFail();
 
   isEnabledNow = mip.radar.isEnabled();
-  t_enable_check = !mip.didLastCallFail() && (isEnabledNow == true);
+  bool checkEnableSuccess = !mip.didLastCallFail() && (isEnabledNow == true);
+  
+  t_enable = enableSuccess;
+  t_isEnabled = (checkDisableSuccess && checkEnableSuccess);
   delay(500);
+
+  // ---------------------------------------------------------
+  // TEST 3: clear()
+  // ---------------------------------------------------------
+  TEST_PRINTLN(F("Test 3: clear()"));
+  mip.radar.clear();
+  // Read should return invalid immediately after clear before new events arrive
+  MiPRadar currentRadar = mip.radar.read();
+  t_clear = (currentRadar == MIP_RADAR_INVALID && mip.lastCallResult() == MiP::MIP_ERROR_NO_EVENT);
+  
+  // ---------------------------------------------------------
+  // TEST 4: read() (Wait for valid data)
+  // ---------------------------------------------------------
+  TEST_PRINTLN(F("Test 4: read() (Waiting for first valid radar ping...)"));
+  uint32_t startWait = millis();
+  while (millis() - startWait < 3000) {
+    currentRadar = mip.radar.read();
+    if (currentRadar != MIP_RADAR_INVALID) {
+      t_read = true;
+      break;
+    }
+    delay(50);
+  }
 
   // ---------------------------------------------------------
   // PRINT SUMMARY TABLE TO CONSOLE
@@ -163,17 +163,16 @@ void runExhaustiveTests() {
   TEST_PRINTLN(F("----------------------------------|---------------"));
   
   printTestResult("disable()", t_disable);
-  printTestResult("isEnabled() [False Check]", t_disable_check);
-  printTestResult("clear() & read() [Empty]", t_clear_read);
-  printTestResult("ping() [One-Shot]", t_ping);
   printTestResult("enable()", t_enable);
-  printTestResult("isEnabled() [True Check]", t_enable_check);
+  printTestResult("isEnabled()", t_isEnabled);
+  printTestResult("clear()", t_clear);
+  printTestResult("read()", t_read);
   
   TEST_PRINTLN(F("=================================================="));
   TEST_PRINTLN(F("Radar.ino: Tests Complete."));
   TEST_PRINTLN();
   TEST_PRINTLN(F("Now, try placing your hand in front of MiP's sensors!"));
-  TEST_PRINTLN(F("Monitoring continuous radar ranges in real-time..."));
+  TEST_PRINTLN(F("Monitoring radar ranges in real-time..."));
 }
 
 /**
@@ -218,9 +217,8 @@ void setup() {
  *
  * @details Services the Telnet server and OTA network tasks. When a Telnet
  * client connects for the first time, it executes runExhaustiveTests().
- * Afterwards, it continuously polls for background radar events (because 
- * enable() was called in the test suite) and wirelessly prints any detected 
- * distance changes.
+ * Afterwards, it continuously polls for radar events and wirelessly prints
+ * any detected distance changes.
  */
 void loop() {
   if (!connectResult) {
@@ -273,4 +271,4 @@ void loop() {
 
   // Yield control briefly to prevent watchdog reset triggers
   delay(10);
-} 
+}

@@ -1,10 +1,9 @@
 /**
  * @file MPU_Radar.h
- * @brief Defines the public interface for radar distance sensing in the MiP library.
+ * @brief Defines the public interface for radar tracking in the MiP library.
  *
- * @details This header declares the API used to manage MiP's IR proximity radar.
- * It provides methods to enable/disable continuous background polling, read cached
- * radar events, or execute a one-shot radar ping.
+ * @details This header declares the radar API used to enable and read radar
+ * events.
  *
  * @author Adam Green (Original Author)
  * @author Samuel Trassare (Maintainer)
@@ -23,104 +22,123 @@
 class MiP;
 
 /**
- * @brief Categorical distance ranges returned by MiP's IR radar sensor.
+ * @brief Proximity distance range intervals reported by MiP's front IR sensors.
  */
 enum MiPRadar : uint8_t {
-  MIP_RADAR_NONE = 0x01,         ///< No object detected within range.
-  MIP_RADAR_10CM_30CM = 0x02,    ///< Object detected between 10cm and 30cm (Distant).
-  MIP_RADAR_0CM_10CM = 0x03,     ///< Object detected between 0cm and 10cm (Near).
-  MIP_RADAR_INVALID = 0xFF       ///< Sentinel value indicating an invalid or empty reading.
+  MIP_RADAR_NONE = 0x01,  ///< No obstacle detected within radar tracking range.
+  MIP_RADAR_10CM_30CM = 0x02,  ///< Obstacle detected between 10cm and 30cm in
+                               ///< front of MiP.
+  MIP_RADAR_0CM_10CM = 0x03,   ///< Obstacle detected between 0cm and 10cm in
+                               ///< front of MiP.
+  MIP_RADAR_INVALID = 0xFF     ///< Initialized default state prior to receiving
+                               ///< any radar event.
 };
 
 /**
- * @brief Manages MiP's IR proximity radar sensor.
+ * @brief Gesture or Radar operating mode states.
+ */
+enum MiPRadarMode : uint8_t {
+  MIP_RADAR_DISABLED = 0x00,  ///< Both radar tracking and gesture detection
+                              ///< modes are disabled.
+  MIP_RADAR = 0x04            ///< Radar proximity tracking mode is active.
+};
+
+/**
+ * @brief Manages MiP's radar proximity tracking system.
  */
 class MiP_Radar {
- public:
+public:
   /**
-   * @brief Enables continuous radar proximity detection.
+   * @brief Resets cached radar tracking data back to MIP_RADAR_INVALID.
+   */
+  void clear();
+
+  /**
+   * @brief Enables radar tracking mode on MiP.
    *
-   * @details When enabled, MiP will actively scan for objects and send Out-Of-Band
-   * (OOB) notifications over UART whenever the distance category changes.
+   * @details Uses verified mode switching (sends mode command + read-back
+   * confirmation with automatic retries on failure).
    */
   void enable();
 
   /**
-   * @brief Disables continuous radar proximity detection.
+   * @brief Disables radar tracking mode.
    *
-   * @details Stops MiP from scanning and sending background OOB radar notifications.
+   * @details Uses verified mode switching (sends disable command + read-back
+   * confirmation with automatic retries on failure).
    */
   void disable();
 
   /**
-   * @brief Checks if continuous radar detection is currently enabled.
+   * @brief Checks whether radar tracking mode is currently active on MiP.
    *
-   * @return true if enabled, false otherwise.
+   * @return true if radar mode is enabled (mode equals MIP_RADAR), false
+   * otherwise.
    */
   bool isEnabled();
 
   /**
-   * @brief Reads the last cached radar event from the background queue.
+   * @brief Reads the most recent radar tracking distance data.
    *
-   * @details Returns the most recent radar detection event received from MiP.
-   * This relies on enable() having been called previously. Once read, the 
-   * cached event is cleared until a new one arrives.
+   * @details Uses cached value from the latest Out-Of-Band status event.
+   * Processes pending serial data first.
    *
-   * @return MiPRadar The detected distance category, or MIP_RADAR_INVALID if no new event exists.
+   * @return MiPRadar Current radar proximity range, or MIP_RADAR_INVALID if no
+   * data received yet.
    */
   MiPRadar read();
 
+protected:
   /**
-   * @brief Performs a one-shot radar ping to get the current distance instantly.
-   *
-   * @details Undocumented command (0x0B). Forces an immediate IR proximity query 
-   * and blocks until MiP returns the current distance category. This allows you 
-   * to check the radar distance without enabling continuous background polling.
-   *
-   * @return MiPRadar The detected distance category, or MIP_RADAR_INVALID on communication failure.
+   * @brief MiP protocol command byte to query the current gesture/radar
+   * operating mode.
    */
-  MiPRadar ping();
-
- protected:
-  /**
-   * @brief MiP protocol command byte to configure continuous radar mode.
-   */
-  static constexpr uint8_t MIP_CMD_SET_RADAR_MODE = 0x0C;
+  static constexpr uint8_t MIP_CMD_GET_GESTURE_RADAR_MODE = 0x0D;
 
   /**
-   * @brief MiP protocol command byte received during an OOB radar event.
+   * @brief MiP protocol command byte to configure the gesture/radar operating
+   * mode.
    */
-  static constexpr uint8_t MIP_CMD_GET_RADAR_RESPONSE = 0x04;
+  static constexpr uint8_t MIP_CMD_SET_GESTURE_RADAR_MODE = 0x0C;
 
   /**
-   * @brief MiP protocol command byte to force a single, one-shot radar ping.
+   * @brief MiP protocol notification byte received when a radar distance update
+   * arrives.
    */
-  static constexpr uint8_t MIP_CMD_RADAR_PING = 0x0B;
+  static constexpr uint8_t MIP_CMD_GET_RADAR_RESPONSE = 0x0C;
 
-  /**
-   * @brief Clears the internal radar event cache.
-   */
-  void clear();
-
- private:
+private:
   /**
    * @brief Private constructor; instantiated strictly by MiP orchestrator.
    *
-   * @param mip Reference to the main MiP object for core communication services.
+   * @param mip A reference to the main MiP object to access core services.
    */
   explicit MiP_Radar(MiP& mip);
 
+  void verifiedSet(MiPRadarMode desiredMode);
+  bool check(MiPRadarMode expectedMode);
+  int8_t rawGet(MiPRadarMode& mode);
+  void rawSet(MiPRadarMode mode);
+
   /**
-   * @brief Handles an incoming radar event notification from the transport layer.
+   * @brief Handles an incoming radar OOB event from the transport layer.
    *
-   * @param radarValue Raw radar category byte reported by MiP.
+   * @details Called by MiP::dispatchEvent() when a MIP_CMD_GET_RADAR_RESPONSE
+   * notification is received. Updates the cached distance and marks the radar
+   * data as valid.
+   *
+   * @param radarCode Raw distance code from MiP (MIP_RADAR_NONE ..
+   * MIP_RADAR_0CM_10CM).
    */
-  void processEvent(uint8_t radarValue);
+  void processEvent(uint8_t radarCode);
 
-  MiP& m_mip;              ///< Stores a reference to the main MiP class.
-  MiPRadar m_currentRadar; ///< The most recently cached radar event.
-  bool m_isEnabled;        ///< Tracks whether continuous radar mode is active.
+  MiP& m_mip;  // Stores a reference to the main MiP class.
+  MiPRadar m_lastRadar;
 
+  /**
+   * @brief Allows MiP and transport components to access private constructor
+   * and protected protocol bytes.
+   */
   friend class MiP;
   friend class MiP_Serial;
 };
