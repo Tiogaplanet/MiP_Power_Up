@@ -95,7 +95,7 @@ class MiP_Radar {
   /**
    * @brief MiP protocol command byte received during an OOB radar event.
    */
-  static constexpr uint8_t MIP_CMD_GET_RADAR_RESPONSE = 0x04;
+  static constexpr uint8_t MIP_CMD_GET_RADAR_RESPONSE = 0x0C;
 
   /**
    * @brief MiP protocol command byte to force a single, one-shot radar ping.
@@ -118,7 +118,7 @@ class MiP_Radar {
   void processEvent(uint8_t radarValue);
 
   MiP& m_mip;              ///< Stores a reference to the main MiP class.
-  MiPRadar m_currentRadar; ///< The most recently cached radar event.
+  MiPRadar m_lastRadar; ///< The most recently cached radar event.
   bool m_isEnabled;        ///< Tracks whether continuous radar mode is active.
 
   friend class MiP;
