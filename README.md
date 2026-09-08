@@ -94,7 +94,7 @@ Comprehensive documentation for every class, function, enum, and constant is ava
 
 👉 **[Read the Full API Reference & Wiki Here](https://github.com/Tiogaplanet/MiP_Power_Up/wiki)**
 
-We provide **20+ example sketches** in the `examples/` folder. We highly recommend starting with `BareMinimumWiFi.ino` (for ESP8266) or `Status.ino` to understand the basics.
+We provide **20+ example sketches** in the `examples/` folder. We highly recommend starting with `Debug.ino` (for ESP8266) or `Status.ino` to understand the basics.
 
 ---
 
